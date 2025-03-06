@@ -17,8 +17,10 @@ DB_CONFIG = {
     "database": "attendance_system"
 }
 
+
 def connect_db():
     return mysql.connector.connect(**DB_CONFIG)
+
 
 # === CREATE TABLE IF NOT EXISTS ===
 def create_table():
@@ -36,7 +38,9 @@ def create_table():
     cursor.close()
     db.close()
 
+
 create_table()
+
 
 # === LOAD KNOWN FACES ===
 def load_faces():
@@ -51,23 +55,26 @@ def load_faces():
                 known_names.append(name)
     return known_encodings, known_names
 
+
 known_encodings, known_names = load_faces()
+
 
 # === MARK ATTENDANCE ===
 def mark_attendance(name):
     db = connect_db()
     cursor = db.cursor()
-    
+
     cursor.execute("SELECT status FROM attendance WHERE name = %s ORDER BY timestamp DESC LIMIT 1", (name,))
     last_status = cursor.fetchone()
-    
+
     new_status = "In" if not last_status or last_status[0] == "Out" else "Out"
-    
+
     cursor.execute("INSERT INTO attendance (name, status) VALUES (%s, %s)", (name, new_status))
     db.commit()
-    
+
     cursor.close()
     db.close()
+
 
 # === PROCESS CCTV FEED ===
 cap = cv2.VideoCapture(IP_CAMERA_URL)
