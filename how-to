@@ -1,0 +1,36 @@
+how to use
+for python starting
+pip install opencv-python numpy face-recognition flask mysql-connector-python ttkbootstrap
+
+ensure mysql is running
+mysql -u root -p
+
+create database
+CREATE DATABASE attendance_system;
+
+create mysql user
+CREATE USER 'attendance_user'@'localhost' IDENTIFIED BY 'your_password';
+GRANT ALL PRIVILEGES ON attendance_system.* TO 'attendance_user'@'localhost';
+FLUSH PRIVILEGES;
+
+create attendance table
+USE attendance_system;
+CREATE TABLE attendance (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100),
+    status ENUM('In', 'Out'),
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+run python app
+python app.py
+python dashboard.py
+
+
+project structure
+
+📁 attendance_system/
+   ├── app.py       
+   ├── dashboard.py  
+   ├── faces/          
+   ├── requirements.txt
