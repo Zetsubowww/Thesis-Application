@@ -1,0 +1,100 @@
+import cv2
+import numpy as np
+import mysql.connector
+import tensorflow as tf
+from keras.models import load_model
+from datetime import datetime
+
+# === Load the trained TensorFlow model ===
+model = load_model("keras_Model.h5", compile=False)
+
+# === Load labels from labels.txt ===
+class_names = open("labels.txt", "r").readlines()
+
+# === Database Configuration ===
+DB_CONFIG = {
+    "host": "localhost",
+    "user": "admin",       # Change this to your MySQL username
+    "password": "root",    # Change this to your MySQL password
+    "database": "attendance_system"
+}
+
+def connect_db():
+    return mysql.connector.connect(**DB_CONFIG)
+
+# === Create Table If Not Exists ===
+def create_table():
+    db = connect_db()
+    cursor = db.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100),
+            status ENUM('In', 'Out'),
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    db.commit()
+    cursor.close()
+    db.close()
+
+create_table()
+
+# === Mark Attendance Function ===
+def mark_attendance(name):
+    db = connect_db()
+    cursor = db.cursor()
+    
+    # Check last status (In/Out) for user
+    cursor.execute("SELECT status FROM attendance WHERE name = %s ORDER BY timestamp DESC LIMIT 1", (name,))
+    last_status = cursor.fetchone()
+    new_status = "In" if not last_status or last_status[0] == "Out" else "Out"
+    
+    # Insert new attendance record
+    cursor.execute("INSERT INTO attendance (name, status) VALUES (%s, %s)", (name, new_status))
+    db.commit()
+    cursor.close()
+    db.close()
+
+# === Start Video Capture ===
+camera = cv2.VideoCapture(0)  # Use webcam
+
+while True:
+    # Capture frame
+    ret, frame = camera.read()
+    if not ret:
+        continue
+
+    # Resize the frame to match model input (224x224)
+    image = cv2.resize(frame, (224, 224), interpolation=cv2.INTER_AREA)
+
+    # Convert to numpy array and normalize
+    image_array = np.asarray(image, dtype=np.float32).reshape(1, 224, 224, 3)
+    image_array = (image_array / 127.5) - 1  # Normalize between -1 and 1
+
+    # Predict the class (person's name)
+    prediction = model.predict(image_array)
+    index = np.argmax(prediction)
+    confidence_score = prediction[0][index]
+
+    # Get the corresponding name from labels.txt
+    name = class_names[index].strip()
+
+    # Display the name and confidence on the frame
+    confidence_text = f"{name} ({confidence_score * 100:.2f}%)"
+    cv2.putText(frame, confidence_text, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+    # If confidence is high, mark attendance
+    if confidence_score > 0.8:  # Adjust confidence threshold if needed
+        mark_attendance(name)
+
+    # Show the video feed
+    cv2.imshow("Face Recognition Attendance", frame)
+
+    # Exit on 'q' key
+    if cv2.waitKey(1) & 0xFF == ord("q"):
+        break
+
+# Cleanup
+camera.release()
+cv2.destroyAllWindows()
